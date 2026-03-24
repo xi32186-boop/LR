@@ -7,7 +7,19 @@ import shap
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
+import os
+import joblib
 
+# 获取 predictor.py 所在目录
+base_dir = os.path.dirname(__file__)
+
+# 模型文件在同一目录下
+model_path = os.path.join(base_dir, "lr_simplified_binary_model.pkl")
+scaler_path = os.path.join(base_dir, "lr_simplified_scaler.pkl")
+
+# 加载模型和 scaler
+lr_model = joblib.load(model_path)
+scaler = joblib.load(scaler_path)
 # ==============================
 # 1️⃣ Load model and scaler
 # ==============================
