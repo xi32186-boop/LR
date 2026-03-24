@@ -1,4 +1,4 @@
-# predictor_fused.py
+# predictor_fully_blank.py
 import streamlit as st
 import pandas as pd
 import joblib
@@ -32,32 +32,41 @@ st.write("Enter the patient's clinical information below, then click Predict to 
 # ==============================
 # 3️⃣ User input interface (sidebar)
 # ==============================
-st.sidebar.header("Patient Information Input")
+st.sidebar.header("Patient Information Input (leave blank if unknown)")
 
-user_input = {}
+# Initialize session state
+if "user_input" not in st.session_state:
+    st.session_state.user_input = {col: "" for col in features_ordered}
+
+# Create text_inputs (fully blank initial)
 for label, col in features_info.items():
-    if col == 'age':
-        # integer, empty initial display
-        user_input[col] = st.sidebar.number_input(label, min_value=20, max_value=120, value=0, step=1, format="%d")
-    elif col in ['wbc', 'hb', 'plt']:
-        # float with 1 decimal
-        user_input[col] = st.sidebar.number_input(label, min_value=0.0, value=0.0, format="%.1f")
-    else:
-        # float with 2 decimals
-        user_input[col] = st.sidebar.number_input(label, min_value=0.0, value=0.0, format="%.2f")
-
-input_df = pd.DataFrame([user_input])
+    st.session_state.user_input[col] = st.sidebar.text_input(
+        label,
+        value=st.session_state.user_input.get(col, "")
+    )
 
 # ==============================
-# 4️⃣ Standardize input
-# ==============================
-input_scaled = scaler.transform(input_df[features_ordered])
-
-# ==============================
-# 5️⃣ Prediction
+# 4️⃣ Convert input to DataFrame + validation
 # ==============================
 if st.button("Predict"):
 
+    # Try converting all inputs to float
+    input_values = {}
+    for col in features_ordered:
+        try:
+            input_values[col] = float(st.session_state.user_input[col])
+        except:
+            st.error(f"⚠️ Please enter a valid number for {col}")
+            st.stop()
+
+    input_df = pd.DataFrame([input_values])
+
+    # Standardize
+    input_scaled = scaler.transform(input_df[features_ordered])
+
+    # ==============================
+    # 5️⃣ Logistic Regression prediction
+    # ==============================
     prob_accel = lr_model.predict_proba(input_scaled)[0, 1]
 
     st.subheader("Prediction Result")
@@ -74,7 +83,7 @@ if st.button("Predict"):
     # ==============================
     # 6️⃣ SHAP explanation
     # ==============================
-    with st.expander("🔍 SHAP Feature Contribution Explanation"):
+    with st.expander("🔍 SHAP Feature Contribution Explanation (Red=Increase Risk, Blue=Decrease Risk)"):
         explainer = shap.LinearExplainer(lr_model, input_scaled, feature_perturbation="interventional")
         shap_values = explainer.shap_values(input_scaled)
 
@@ -86,21 +95,14 @@ if st.button("Predict"):
         st.dataframe(shap_df)
 
         # -------------------------
-        # Bar plot (matplotlib)
-        # -------------------------
-        plt.figure(figsize=(6, 4))
-        shap.bar_plot(shap_values[0], feature_names=list(features_info.keys()))
-        st.pyplot(plt)
-
-        # -------------------------
-        # Waterfall plot (publication)
+        # Waterfall plot (publication style)
         # -------------------------
         st.write("Waterfall Plot (Recommended for Publication)")
         shap.plots.waterfall(shap_values[0])
         st.pyplot(plt.gcf())
 
         # -------------------------
-        # HTML interactive force plot
+        # HTML interactive force plot (red/blue bars)
         # -------------------------
         st.write("Interactive SHAP Force Plot")
         force_plot = shap.force_plot(
