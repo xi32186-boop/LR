@@ -1,8 +1,10 @@
-# predictor_xgb.py
+# predictor_xgb_cogage.py
 import streamlit as st
 import pandas as pd
 import joblib
 import shap
+import matplotlib.pyplot as plt
+import numpy as np
 
 # ==============================
 # 1️⃣ Load model & scaler
@@ -11,75 +13,85 @@ xgb_model = joblib.load("xgb_simplified_binary_model.pkl")
 scaler = joblib.load("xgb_simplified_scaler.pkl")
 
 # ==============================
-# 2️⃣ Features
+# 2️⃣ Feature definition
 # ==============================
-features_info = {
-    'Age (years)': 'age',
-    'Glucose (mmol/L)': 'glu',
-    'White Blood Cells (10^9/L)': 'wbc',
-    'Hemoglobin (g/L)': 'hb',
-    'Platelets (10^9/L)': 'plt',
-    'ALT (U/L)': 'alt'
+feature_names = ['age', 'glu', 'wbc', 'hb', 'plt', 'alt']
+feature_labels = {
+    'age': 'Age (years)',
+    'glu': 'Glucose (mmol/L)',
+    'wbc': 'White Blood Cells (10^9/L)',
+    'hb': 'Hemoglobin (g/L)',
+    'plt': 'Platelets (10^9/L)',
+    'alt': 'ALT (U/L)'
 }
-features_ordered = list(features_info.values())
+
+# Check feature number
+if len(feature_names) != 6:
+    st.error("Error: Feature number is not 6. Please check your features!")
+    st.stop()
 
 # ==============================
-# 3️⃣ Page
+# 3️⃣ Streamlit Input
 # ==============================
-st.set_page_config(page_title="Cognitive Aging Prediction", layout="centered")
-st.title("Cognitive Aging Acceleration Risk Prediction")
+st.subheader("Enter Laboratory Test Results:")
+
+# Initialize session state to keep inputs persistent
+if 'user_input' not in st.session_state:
+    st.session_state.user_input = {feature: 0.0 for feature in feature_names}
+
+for feature in feature_names:
+    st.session_state.user_input[feature] = st.number_input(
+        feature_labels[feature],
+        value=st.session_state.user_input.get(feature, 0.0),
+        key=feature
+    )
+
+# Convert input to DataFrame
+input_df = pd.DataFrame([st.session_state.user_input])
+
+# Standardize input
+input_scaled = scaler.transform(input_df)
 
 # ==============================
-# 4️⃣ Input (empty by default)
-# ==============================
-if "user_input" not in st.session_state:
-    st.session_state.user_input = {col: "" for col in features_ordered}
-
-for label, col in features_info.items():
-    st.session_state.user_input[col] = st.text_input(label, value="")
-
-# ==============================
-# 5️⃣ Predict button
+# 4️⃣ Prediction
 # ==============================
 if st.button("Predict"):
-    # Convert to float
-    input_values = {}
-    for col in features_ordered:
-        try:
-            input_values[col] = float(st.session_state.user_input[col])
-        except:
-            st.error(f"Please enter a valid number for {col}")
-            st.stop()
-    input_df = pd.DataFrame([input_values])
+    pred_prob = xgb_model.predict_proba(input_scaled)[0, 1]
 
-    # Standardize (可选)
-    input_scaled = scaler.transform(input_df[features_ordered])
+    st.subheader("Prediction Result:")
+    st.markdown(
+        f'<h4 style="color:black;">Probability of Cognitive Aging Acceleration: {pred_prob*100:.1f}%</h4>',
+        unsafe_allow_html=True
+    )
 
-    # Prediction
-    prob = xgb_model.predict_proba(input_scaled)[0,1]
-    st.subheader("Prediction Result")
-    st.write(f"Probability of Cognitive Aging Acceleration: **{prob*100:.1f}%**")
-    if prob < 0.3:
-        st.markdown('<h4 style="color:green;">Low Risk</h4>', unsafe_allow_html=True)
-    elif prob <= 0.6:
-        st.markdown('<h4 style="color:orange;">Moderate Risk</h4>', unsafe_allow_html=True)
+    # Risk Level
+    if pred_prob < 0.3:
+        st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
+    elif pred_prob <= 0.6:
+        st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
     else:
-        st.markdown('<h4 style="color:red;">High Risk</h4>', unsafe_allow_html=True)
+        st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
     # ==============================
-    # SHAP explanation using TreeExplainer
+    # 5️⃣ SHAP Interpretation
     # ==============================
     st.subheader("SHAP Feature Contribution")
-    st.write("Red = increase risk, Blue = decrease risk")
+    st.write("Red = increases risk, Blue = decreases risk")
 
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer(input_scaled)
 
+    # Handle expected_value as scalar or array
+    ev = explainer.expected_value
+    if isinstance(ev, np.ndarray) and len(ev) > 1:
+        ev = ev[1]  # positive class
+
+    # Single-sample force plot
     force_plot = shap.force_plot(
-        explainer.expected_value[1],
+        ev,
         shap_values.values[0],
         input_df,
-        feature_names=list(features_info.keys())
+        feature_names=list(feature_labels.values())
     )
 
     st.components.v1.html(
