@@ -5,6 +5,11 @@ import joblib
 import shap
 import numpy as np
 
+import xgboost as xgb
+
+import matplotlib.pyplot as plt
+import os
+
 # ==============================
 # 1️⃣ Load model
 # ==============================
