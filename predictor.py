@@ -1,4 +1,4 @@
-# predictor_xgb_layout.py
+# predictor_xgb_layout_centered.py
 import streamlit as st
 import pandas as pd
 import joblib
@@ -27,14 +27,19 @@ st.set_page_config(page_title="Cognitive Aging Prediction", layout="wide")
 st.title("Cognitive Aging Acceleration Risk Prediction")
 
 # ==============================
-# 3️⃣ Input Fields 左右布局
+# 3️⃣ Initialize session state
 # ==============================
 if 'user_input' not in st.session_state:
     st.session_state.user_input = {f: 0.0 for f in feature_names}
 
-col1, col2 = st.columns(2)
+# ==============================
+# 4️⃣ Layout: 左右列 + 留白
+# ==============================
+# 页面分5列：左空白 1/6，左列 1/3，右列 1/3，右空白 1/6
+empty1, col_left, col_right, empty2 = st.columns([1, 2, 2, 1])
 
-with col1:
+# 左列：前三个特征
+with col_left:
     for feature in feature_names[:3]:
         st.session_state.user_input[feature] = st.number_input(
             feature_labels[feature],
@@ -42,7 +47,8 @@ with col1:
             key=feature
         )
 
-with col2:
+# 右列：后三个特征
+with col_right:
     for feature in feature_names[3:]:
         st.session_state.user_input[feature] = st.number_input(
             feature_labels[feature],
@@ -53,7 +59,7 @@ with col2:
 input_df = pd.DataFrame([st.session_state.user_input])
 
 # ==============================
-# 4️⃣ Prediction
+# 5️⃣ Prediction
 # ==============================
 prob = xgb_model.predict_proba(input_df)[0, 1]
 
@@ -71,7 +77,7 @@ else:
     st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
 # ==============================
-# 5️⃣ SHAP解释力图
+# 6️⃣ SHAP解释力图
 # ==============================
 st.subheader("SHAP Feature Contribution")
 st.write("Red = increases risk, Blue = decreases risk")
@@ -84,6 +90,7 @@ ev = explainer.expected_value
 if isinstance(ev, np.ndarray) and len(ev) > 1:
     ev = ev[1]  # 正类
 
+# 单样本 force plot
 force_plot = shap.force_plot(
     ev,
     shap_values.values[0],
