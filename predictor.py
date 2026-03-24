@@ -1,4 +1,4 @@
-# predictor_xgb_dynamic.py
+# predictor_xgb_layout.py
 import streamlit as st
 import pandas as pd
 import joblib
@@ -23,74 +23,75 @@ feature_labels = {
     'alt': 'ALT (U/L)'
 }
 
-st.set_page_config(page_title="Cognitive Aging Prediction", layout="centered")
+st.set_page_config(page_title="Cognitive Aging Prediction", layout="wide")
 st.title("Cognitive Aging Acceleration Risk Prediction")
 
 # ==============================
-# 3️⃣ Input Fields
+# 3️⃣ Input Fields 左右布局
 # ==============================
 if 'user_input' not in st.session_state:
     st.session_state.user_input = {f: 0.0 for f in feature_names}
 
-input_changed = False  # Flag to trigger prediction
+col1, col2 = st.columns(2)
 
-def update_input(feature, value):
-    st.session_state.user_input[feature] = value
-    st.session_state.input_changed = True
+with col1:
+    for feature in feature_names[:3]:
+        st.session_state.user_input[feature] = st.number_input(
+            feature_labels[feature],
+            value=st.session_state.user_input.get(feature, 0.0),
+            key=feature
+        )
 
-# Create number inputs for each feature
-for feature in feature_names:
-    st.number_input(
-        feature_labels[feature],
-        value=st.session_state.user_input[feature],
-        key=feature,
-        on_change=lambda f=feature, v=st.session_state.user_input[feature]: update_input(f, v)
-    )
+with col2:
+    for feature in feature_names[3:]:
+        st.session_state.user_input[feature] = st.number_input(
+            feature_labels[feature],
+            value=st.session_state.user_input.get(feature, 0.0),
+            key=feature
+        )
 
-# ==============================
-# 4️⃣ Single-sample Prediction + SHAP
-# ==============================
 input_df = pd.DataFrame([st.session_state.user_input])
 
-# Only compute when inputs are available
-if True:
-    # Prediction
-    prob = xgb_model.predict_proba(input_df)[0, 1]
+# ==============================
+# 4️⃣ Prediction
+# ==============================
+prob = xgb_model.predict_proba(input_df)[0, 1]
 
-    st.subheader("Prediction Result")
-    st.markdown(
-        f'<h4 style="color:black;">Probability of Cognitive Aging Acceleration: {prob*100:.1f}%</h4>',
-        unsafe_allow_html=True
-    )
+st.subheader("Prediction Result")
+st.markdown(
+    f'<h4 style="color:black;">Probability of Cognitive Aging Acceleration: {prob*100:.1f}%</h4>',
+    unsafe_allow_html=True
+)
 
-    if prob < 0.3:
-        st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
-    elif prob <= 0.6:
-        st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
-    else:
-        st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
+if prob < 0.3:
+    st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
+elif prob <= 0.6:
+    st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
+else:
+    st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
-    # SHAP explanation
-    st.subheader("SHAP Feature Contribution")
-    st.write("Red = increases risk, Blue = decreases risk")
+# ==============================
+# 5️⃣ SHAP解释力图
+# ==============================
+st.subheader("SHAP Feature Contribution")
+st.write("Red = increases risk, Blue = decreases risk")
 
-    explainer = shap.TreeExplainer(xgb_model)
-    shap_values = explainer(input_df)
+explainer = shap.TreeExplainer(xgb_model)
+shap_values = explainer(input_df)
 
-    # Handle expected_value as scalar or array
-    ev = explainer.expected_value
-    if isinstance(ev, np.ndarray) and len(ev) > 1:
-        ev = ev[1]  # positive class
+# 处理 expected_value
+ev = explainer.expected_value
+if isinstance(ev, np.ndarray) and len(ev) > 1:
+    ev = ev[1]  # 正类
 
-    # Single-sample force plot
-    force_plot = shap.force_plot(
-        ev,
-        shap_values.values[0],
-        input_df,
-        feature_names=list(feature_labels.values())
-    )
+force_plot = shap.force_plot(
+    ev,
+    shap_values.values[0],
+    input_df,
+    feature_names=list(feature_labels.values())
+)
 
-    st.components.v1.html(
-        f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>",
-        height=400
-    )
+st.components.v1.html(
+    f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>",
+    height=400
+)
