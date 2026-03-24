@@ -112,16 +112,5 @@ if st.button("Predict"):
 
     st.pyplot(plt.gcf())
 
-    # ==============================
-    # ✅ 方式2：交互版（可选）
-    # ==============================
-    with st.expander("Show Interactive SHAP Plot"):
-        force_plot = shap.plots.force(shap_values[0])
-
-        st.components.v1.html(
-            f"""
-            <head>{shap.getjs()}</head>
-            <body>{force_plot.html()}</body>
-            """,
-            height=300
-        )
+ 
+        
