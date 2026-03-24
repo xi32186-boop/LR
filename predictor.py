@@ -1,9 +1,8 @@
-# predictor_no_sidebar.py
+# predictor_forceplot_only.py
 import streamlit as st
 import pandas as pd
 import joblib
 import shap
-import matplotlib.pyplot as plt
 
 # ==============================
 # 1️⃣ Load model and scaler
@@ -44,11 +43,11 @@ for label, col in features_info.items():
     )
 
 # ==============================
-# 4️⃣ Convert input to DataFrame + validation
+# 4️⃣ Prediction button
 # ==============================
 if st.button("Predict"):
 
-    # Convert to float
+    # Convert input to float
     input_values = {}
     for col in features_ordered:
         try:
@@ -79,43 +78,24 @@ if st.button("Predict"):
         st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
     # ==============================
-    # 6️⃣ SHAP explanation
+    # 6️⃣ SHAP HTML force plot (红蓝条)
     # ==============================
-    with st.expander("🔍 SHAP Feature Contribution Explanation (Red=Increase Risk, Blue=Decrease Risk)"):
-        explainer = shap.LinearExplainer(lr_model, input_scaled, feature_perturbation="interventional")
-        shap_values = explainer.shap_values(input_scaled)
+    st.subheader("SHAP Feature Contribution")
+    st.write("Red = increases risk, Blue = decreases risk")
 
-        # SHAP dataframe
-        shap_df = pd.DataFrame({
-            'Feature': list(features_info.keys()),
-            'SHAP value': shap_values[0]
-        }).sort_values(by='SHAP value', key=abs, ascending=False)
-        st.dataframe(shap_df)
+    # LinearExplainer
+    explainer = shap.LinearExplainer(lr_model, input_scaled, feature_perturbation="interventional")
+    shap_values = explainer.shap_values(input_scaled)
 
-        # -------------------------
-        # Waterfall plot (fixed)
-        # -------------------------
-        st.write("Waterfall Plot (Publication style)")
-        expl = shap.Explanation(
-            values=shap_values[0],
-            base_values=explainer.expected_value,
-            data=input_df.values[0],
-            feature_names=list(features_info.keys())
-        )
-        shap.plots.waterfall(expl)
-        st.pyplot(plt.gcf())
+    # Important: pass 2D arrays for single sample to show red/blue bars
+    force_plot = shap.force_plot(
+        explainer.expected_value,   # base value
+        shap_values,                # 2D array
+        input_scaled,               # 2D array of input
+        feature_names=list(features_info.keys())
+    )
 
-        # -------------------------
-        # HTML interactive force plot
-        # -------------------------
-        st.write("Interactive SHAP Force Plot")
-        force_plot = shap.force_plot(
-            explainer.expected_value,
-            shap_values[0],
-            input_df.iloc[0],
-            feature_names=list(features_info.keys())
-        )
-        st.components.v1.html(
-            f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>",
-            height=350
-        )
+    st.components.v1.html(
+        f"<head>{shap.getjs()}</head><body>{force_plot.html()}</body>",
+        height=400
+    )
