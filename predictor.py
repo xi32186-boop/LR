@@ -1,13 +1,12 @@
-# predictor_xgb_raw.py
+# predictor_xgb_dynamic.py
 import streamlit as st
 import pandas as pd
 import joblib
 import shap
-import matplotlib.pyplot as plt
 import numpy as np
 
 # ==============================
-# 1️⃣ Load model (no scaler needed)
+# 1️⃣ Load model
 # ==============================
 xgb_model = joblib.load("xgb_simplified_binary_model.pkl")
 
@@ -24,53 +23,54 @@ feature_labels = {
     'alt': 'ALT (U/L)'
 }
 
-# Check feature number
-if len(feature_names) != 6:
-    st.error("Error: Feature number is not 6. Please check your features!")
-    st.stop()
+st.set_page_config(page_title="Cognitive Aging Prediction", layout="centered")
+st.title("Cognitive Aging Acceleration Risk Prediction")
 
 # ==============================
-# 3️⃣ Streamlit Input
+# 3️⃣ Input Fields
 # ==============================
-st.subheader("Enter Laboratory Test Results:")
-
-# Initialize session state to keep inputs persistent
 if 'user_input' not in st.session_state:
-    st.session_state.user_input = {feature: 0.0 for feature in feature_names}
+    st.session_state.user_input = {f: 0.0 for f in feature_names}
 
+input_changed = False  # Flag to trigger prediction
+
+def update_input(feature, value):
+    st.session_state.user_input[feature] = value
+    st.session_state.input_changed = True
+
+# Create number inputs for each feature
 for feature in feature_names:
-    st.session_state.user_input[feature] = st.number_input(
+    st.number_input(
         feature_labels[feature],
-        value=st.session_state.user_input.get(feature, 0.0),
-        key=feature
+        value=st.session_state.user_input[feature],
+        key=feature,
+        on_change=lambda f=feature, v=st.session_state.user_input[feature]: update_input(f, v)
     )
 
-# Convert input to DataFrame
+# ==============================
+# 4️⃣ Single-sample Prediction + SHAP
+# ==============================
 input_df = pd.DataFrame([st.session_state.user_input])
 
-# ==============================
-# 4️⃣ Prediction
-# ==============================
-if st.button("Predict"):
-    pred_prob = xgb_model.predict_proba(input_df)[0, 1]
+# Only compute when inputs are available
+if True:
+    # Prediction
+    prob = xgb_model.predict_proba(input_df)[0, 1]
 
-    st.subheader("Prediction Result:")
+    st.subheader("Prediction Result")
     st.markdown(
-        f'<h4 style="color:black;">Probability of Cognitive Aging Acceleration: {pred_prob*100:.1f}%</h4>',
+        f'<h4 style="color:black;">Probability of Cognitive Aging Acceleration: {prob*100:.1f}%</h4>',
         unsafe_allow_html=True
     )
 
-    # Risk Level
-    if pred_prob < 0.3:
+    if prob < 0.3:
         st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
-    elif pred_prob <= 0.6:
+    elif prob <= 0.6:
         st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
     else:
         st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
-    # ==============================
-    # 5️⃣ SHAP Interpretation
-    # ==============================
+    # SHAP explanation
     st.subheader("SHAP Feature Contribution")
     st.write("Red = increases risk, Blue = decreases risk")
 
