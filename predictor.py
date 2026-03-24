@@ -8,7 +8,7 @@ import numpy as np
 # ==============================
 # 1️⃣ Load XGBoost model
 # ==============================
-xgb_model = joblib.load("xgb_10features_model.pkl")  # 你训练好的模型
+xgb_model = joblib.load("xgb_directional_10features_model.pkl")  # 你训练好的模型
 
 # ==============================
 # 2️⃣ Feature definition
