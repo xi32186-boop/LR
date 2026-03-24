@@ -1,4 +1,4 @@
-# predictor_fully_blank.py
+# predictor_no_sidebar.py
 import streamlit as st
 import pandas as pd
 import joblib
@@ -30,17 +30,15 @@ st.title("🔹 Cognitive Aging Acceleration Risk Prediction")
 st.write("Enter the patient's clinical information below, then click Predict to see the risk probability and SHAP explanation.")
 
 # ==============================
-# 3️⃣ User input interface (sidebar)
+# 3️⃣ User input interface (page inputs, fully blank)
 # ==============================
-st.sidebar.header("Patient Information Input (leave blank if unknown)")
+st.header("Patient Information Input")
 
-# Initialize session state
 if "user_input" not in st.session_state:
     st.session_state.user_input = {col: "" for col in features_ordered}
 
-# Create text_inputs (fully blank initial)
 for label, col in features_info.items():
-    st.session_state.user_input[col] = st.sidebar.text_input(
+    st.session_state.user_input[col] = st.text_input(
         label,
         value=st.session_state.user_input.get(col, "")
     )
@@ -50,7 +48,7 @@ for label, col in features_info.items():
 # ==============================
 if st.button("Predict"):
 
-    # Try converting all inputs to float
+    # Convert to float
     input_values = {}
     for col in features_ordered:
         try:
@@ -95,14 +93,20 @@ if st.button("Predict"):
         st.dataframe(shap_df)
 
         # -------------------------
-        # Waterfall plot (publication style)
+        # Waterfall plot (fixed)
         # -------------------------
-        st.write("Waterfall Plot (Recommended for Publication)")
-        shap.plots.waterfall(shap_values[0])
+        st.write("Waterfall Plot (Publication style)")
+        expl = shap.Explanation(
+            values=shap_values[0],
+            base_values=explainer.expected_value,
+            data=input_df.values[0],
+            feature_names=list(features_info.keys())
+        )
+        shap.plots.waterfall(expl)
         st.pyplot(plt.gcf())
 
         # -------------------------
-        # HTML interactive force plot (red/blue bars)
+        # HTML interactive force plot
         # -------------------------
         st.write("Interactive SHAP Force Plot")
         force_plot = shap.force_plot(
