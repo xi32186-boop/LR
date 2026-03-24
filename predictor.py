@@ -75,24 +75,25 @@ with col_right:
 # ==============================
 # 6️⃣ Prediction
 # ==============================
-input_values = st.session_state.user_input.copy()
+
+# 填充空值
+input_values = {
+    f: (st.session_state.user_input[f] if st.session_state.user_input[f] is not None else 0.0)
+    for f in features
+}
 input_df = pd.DataFrame([input_values], columns=features)
 
-# 使用 XGBoost predict_proba
-prob = xgb_model.predict_proba(input_df)[0,1]
+# 强制 float 类型
+input_df = input_df.astype(np.float64)
+
+# 预测概率
+prob = xgb_model.predict_proba(input_df)[0, 1]
 
 st.subheader("Prediction Result")
 st.markdown(
     f'<h4 style="color:black;">Probability of Cognitive Aging Acceleration: {prob*100:.1f}%</h4>',
     unsafe_allow_html=True
 )
-
-if prob < 0.3:
-    st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
-elif prob <= 0.6:
-    st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
-else:
-    st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
 # ==============================
 # 7️⃣ SHAP Explanation
