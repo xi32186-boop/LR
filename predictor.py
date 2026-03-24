@@ -60,14 +60,7 @@ st.write(f"📈 Probability of Cognitive Aging Acceleration: **{prob_accel * 100
 # ==============================
 # 5️⃣ SHAP feature explanation
 # ==============================
-import shap
-import streamlit as st
-
-
 with st.expander("SHAP Feature Contribution Explanation"):
-
-    # 初始化 JS（关键）
-    shap.initjs()
 
     explainer = shap.LinearExplainer(lr_model, input_scaled)
     shap_values = explainer.shap_values(input_scaled)
@@ -79,7 +72,12 @@ with st.expander("SHAP Feature Contribution Explanation"):
         feature_names=list(features_info.keys())
     )
 
-    # ⚠️ 必须用 HTML 渲染
-    st.components.v1.html(force_plot.html(), height=300)
+    st.components.v1.html(
+        f"""
+        <head>{shap.getjs()}</head>
+        <body>{force_plot.html()}</body>
+        """,
+        height=350
+    )
 
 
