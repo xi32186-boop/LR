@@ -104,13 +104,6 @@ if st.button("Predict"):
     shap_values = explainer(input_scaled)
 
     # ------------------------------
-    # 论文/截图用 waterfall
-    # ------------------------------
-    st.write("Waterfall plot (recommended for publication):")
-    shap.plots.waterfall(shap_values[0])
-    st.pyplot(plt.gcf())
-
-    # ------------------------------
     # 交互力图（红蓝条）
     # ------------------------------
     with st.expander("Show Interactive SHAP Force Plot"):
