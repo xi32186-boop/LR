@@ -6,6 +6,13 @@ import shap
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
+try:
+    import joblib
+except ModuleNotFoundError:
+    import pip
+    pip.main(['install','joblib'])
+    import joblib
+
 # ==============================
 # 1️⃣ Load model and scaler
 # ==============================
