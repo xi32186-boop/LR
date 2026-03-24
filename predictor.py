@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import shap
+import matplotlib.pyplot as plt
 
 # ==============================
 # Page settings
@@ -13,7 +14,7 @@ st.set_page_config(page_title="Cognitive Aging Risk Prediction", layout="centere
 # Title
 # ==============================
 st.title("Cognitive Aging Acceleration Risk Prediction")
-st.write("Please enter the following information, then click 'Predict' to get the risk probability and SHAP interpretation.")
+st.write("Please enter the patient's clinical information below, then click 'Predict' to see the risk probability and SHAP interpretation.")
 
 # ==============================
 # Load model
@@ -24,7 +25,7 @@ def load_model():
     scaler = joblib.load("lr_simplified_scaler.pkl")
     return model, scaler
 
-lr_model, scaler = load_model()
+model, scaler = load_model()
 
 # ==============================
 # Feature info
@@ -41,11 +42,10 @@ feature_labels = {
 }
 
 # ==============================
-# Input section（参考你给的格式）
+# Input
 # ==============================
 st.subheader("Enter Clinical Information:")
 
-# session_state 保持输入
 if "user_input" not in st.session_state:
     st.session_state.user_input = {f: 0.0 for f in feature_names}
 
@@ -64,25 +64,25 @@ input_df = pd.DataFrame([st.session_state.user_input])
 # ==============================
 if st.button("Predict"):
 
-    # 保留1位小数（展示更专业）
+    # ⭐ 保留1位小数（论文风格）
     input_df = input_df.round(1)
 
     # 标准化
     input_scaled = scaler.transform(input_df)
 
     # 预测概率
-    prob = lr_model.predict_proba(input_scaled)[0, 1]
+    prob = model.predict_proba(input_scaled)[0, 1]
 
     st.subheader("Prediction Results:")
 
     # 概率
     st.markdown(
-        f'<h4>Predicted Risk of Cognitive Aging Acceleration: {prob:.2%}</h4>',
+        f'<h4 style="color:black;">Predicted Risk of Cognitive Aging Acceleration: {prob:.2%}</h4>',
         unsafe_allow_html=True
     )
 
     # ==============================
-    # Risk level
+    # Risk Level
     # ==============================
     if prob < 0.3:
         st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
@@ -95,22 +95,33 @@ if st.button("Predict"):
     # SHAP
     # ==============================
     st.subheader("SHAP Interpretation:")
-    st.write("The figure below shows how each feature contributes to the prediction:")
+    st.write("The figure below shows how each feature pushes the prediction:")
 
-    explainer = shap.LinearExplainer(lr_model, input_scaled)
-    shap_values = explainer.shap_values(input_scaled)
+    # ⭐ 推荐方式（更标准）
+    explainer = shap.Explainer(model, input_scaled)
+    shap_values = explainer(input_scaled)
 
-    force_plot = shap.force_plot(
-        explainer.expected_value,
+    # ==============================
+    # ✅ 方式1：matplotlib（推荐发表）
+    # ==============================
+    fig = shap.plots.force(
         shap_values[0],
-        input_df.iloc[0],   # ⭐ 用原始值展示
-        feature_names=[feature_labels[f] for f in feature_names]
+        matplotlib=True,
+        show=False
     )
 
-    st.components.v1.html(
-        f"""
-        <head>{shap.getjs()}</head>
-        <body>{force_plot.html()}</body>
-        """,
-        height=350
-    )
+    st.pyplot(plt.gcf())
+
+    # ==============================
+    # ✅ 方式2：交互版（可选）
+    # ==============================
+    with st.expander("Show Interactive SHAP Plot"):
+        force_plot = shap.plots.force(shap_values[0])
+
+        st.components.v1.html(
+            f"""
+            <head>{shap.getjs()}</head>
+            <body>{force_plot.html()}</body>
+            """,
+            height=300
+        )
