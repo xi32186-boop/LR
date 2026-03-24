@@ -42,30 +42,34 @@ feature_labels = {
 }
 
 # ==============================
-# Input
+# Input section
 # ==============================
 st.subheader("Enter Clinical Information:")
 
+# 初始为空
 if "user_input" not in st.session_state:
-    st.session_state.user_input = {f: 0.0 for f in feature_names}
+    st.session_state.user_input = {f: "" for f in feature_names}
 
 for f in feature_names:
-    st.session_state.user_input[f] = st.number_input(
+    st.session_state.user_input[f] = st.text_input(
         feature_labels[f],
-        value=st.session_state.user_input.get(f, 0.0),
+        value=st.session_state.user_input.get(f, ""),
         key=f
     )
-
-# DataFrame
-input_df = pd.DataFrame([st.session_state.user_input])
 
 # ==============================
 # Prediction
 # ==============================
 if st.button("Predict"):
 
-    # ⭐ 保留1位小数（论文风格）
-    input_df = input_df.round(1)
+    # 校验输入
+    try:
+        input_values = {k: float(v) for k, v in st.session_state.user_input.items()}
+    except:
+        st.error("⚠️ Please enter valid numeric values!")
+        st.stop()
+
+    input_df = pd.DataFrame([input_values]).round(1)
 
     # 标准化
     input_scaled = scaler.transform(input_df)
@@ -75,15 +79,13 @@ if st.button("Predict"):
 
     st.subheader("Prediction Results:")
 
-    # 概率
+    # 概率显示
     st.markdown(
         f'<h4 style="color:black;">Predicted Risk of Cognitive Aging Acceleration: {prob:.2%}</h4>',
         unsafe_allow_html=True
     )
 
-    # ==============================
-    # Risk Level
-    # ==============================
+    # 风险分级
     if prob < 0.3:
         st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
     elif 0.3 <= prob <= 0.6:
@@ -92,25 +94,31 @@ if st.button("Predict"):
         st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
     # ==============================
-    # SHAP
+    # SHAP Interpretation
     # ==============================
     st.subheader("SHAP Interpretation:")
-    st.write("The figure below shows how each feature pushes the prediction:")
+    st.write("The figure below shows how each feature contributes to the prediction:")
 
-    # ⭐ 推荐方式（更标准）
+    # Explainer
     explainer = shap.Explainer(model, input_scaled)
     shap_values = explainer(input_scaled)
 
-    # ==============================
-    # ✅ 方式1：matplotlib（推荐发表）
-    # ==============================
-    fig = shap.plots.force(
-        shap_values[0],
-        matplotlib=True,
-        show=False
-    )
-
+    # ------------------------------
+    # 论文/截图用 waterfall
+    # ------------------------------
+    st.write("Waterfall plot (recommended for publication):")
+    shap.plots.waterfall(shap_values[0])
     st.pyplot(plt.gcf())
 
- 
-        
+    # ------------------------------
+    # 交互力图（红蓝条）
+    # ------------------------------
+    with st.expander("Show Interactive SHAP Force Plot"):
+        force_plot = shap.plots.force(shap_values[0])
+        st.components.v1.html(
+            f"""
+            <head>{shap.getjs()}</head>
+            <body>{force_plot.html()}</body>
+            """,
+            height=300
+        )
