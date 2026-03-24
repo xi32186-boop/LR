@@ -60,27 +60,22 @@ st.write(f"📈 Probability of Cognitive Aging Acceleration: **{prob_accel * 100
 # ==============================
 # 5️⃣ SHAP feature explanation
 # ==============================
+import shap
+import streamlit as st
+
 with st.expander("SHAP Feature Contribution Explanation"):
 
+    # 建议用训练集背景（更稳定）
     explainer = shap.LinearExplainer(lr_model, input_scaled)
     shap_values = explainer.shap_values(input_scaled)
 
-    values = shap_values[0]
+    # 构建 force plot
+    force_plot = shap.force_plot(
+        explainer.expected_value,
+        shap_values[0],
+        input_scaled[0],
+        feature_names=list(features_info.keys())
+    )
 
-    shap_df = pd.DataFrame({
-        'Feature': list(features_info.keys()),
-        'SHAP value': values
-    }).sort_values(by='SHAP value', key=abs, ascending=True)
-
-    st.dataframe(shap_df)
-
-    fig, ax = plt.subplots()
-    ax.barh(shap_df['Feature'], shap_df['SHAP value'])
-    ax.set_title("SHAP Feature Contribution")
-
-    st.pyplot(fig)
-
-    # Bar plot
-    plt.figure(figsize=(6, 4))
-    shap.bar_plot(shap_values[0], feature_names=list(features_info.keys()))
-    st.pyplot(plt)
+    # ⚠️ 关键：用 HTML 渲染
+    st.components.v1.html(force_plot.html(), height=300)
