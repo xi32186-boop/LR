@@ -62,13 +62,23 @@ st.write(f"📈 Probability of Cognitive Aging Acceleration: **{prob_accel * 100
 # ==============================
 with st.expander("SHAP Feature Contribution Explanation"):
 
+    # 原始输入
+    input_df = pd.DataFrame([user_input])
+
+    # ⭐ 保留1位小数（关键位置）
+    input_df = input_df.round(1)
+
+    # 标准化（用于模型）
+    input_scaled = scaler.transform(input_df)
+
+    # SHAP
     explainer = shap.LinearExplainer(lr_model, input_scaled)
     shap_values = explainer.shap_values(input_scaled)
 
     force_plot = shap.force_plot(
         explainer.expected_value,
         shap_values[0],
-        input_scaled[0],
+        input_df.iloc[0],   # 用原始数据（已round）
         feature_names=list(features_info.keys())
     )
 
@@ -79,5 +89,3 @@ with st.expander("SHAP Feature Contribution Explanation"):
         """,
         height=350
     )
-
-
