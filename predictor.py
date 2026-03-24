@@ -32,86 +32,72 @@ model, scaler = load_model()
 # ==============================
 feature_names = ["age", "glu", "wbc", "hb", "plt", "alt"]
 
-feature_labels = {
-    "age": "Age (years)",
-    "glu": "Glucose (mmol/L)",
-    "wbc": "White Blood Cells (10^9/L)",
-    "hb": "Hemoglobin (g/L)",
-    "plt": "Platelets (10^9/L)",
-    "alt": "ALT (U/L)"
+feature_units = {
+    "age": "(years)",
+    "glu": "(mmol/L)",
+    "wbc": "(10^9/L)",
+    "hb": "(g/L)",
+    "plt": "(10^9/L)",
+    "alt": "(U/L)"
 }
 
 # ==============================
-# Input section
+# Input fields
 # ==============================
-st.subheader("Enter Clinical Information:")
+st.subheader("Enter Laboratory Test Results:")
 
-# 初始为空
-if "user_input" not in st.session_state:
-    st.session_state.user_input = {f: "" for f in feature_names}
+# Initialize session state
+if 'user_input' not in st.session_state:
+    st.session_state.user_input = {feature: 0.0 for feature in feature_names}
 
-for f in feature_names:
-    st.session_state.user_input[f] = st.text_input(
-        feature_labels[f],
-        value=st.session_state.user_input.get(f, ""),
-        key=f
+for feature in feature_names:
+    label = f"{feature} {feature_units.get(feature, '')}"
+    st.session_state.user_input[feature] = st.number_input(
+        label,
+        value=st.session_state.user_input.get(feature, 0.0),
+        key=feature
     )
+
+# Convert input to DataFrame
+input_df = pd.DataFrame([st.session_state.user_input])
 
 # ==============================
 # Prediction
 # ==============================
 if st.button("Predict"):
 
-    # 校验输入
-    try:
-        input_values = {k: float(v) for k, v in st.session_state.user_input.items()}
-    except:
-        st.error("⚠️ Please enter valid numeric values!")
-        st.stop()
-
-    input_df = pd.DataFrame([input_values]).round(1)
-
-    # 标准化
+    # 标准化输入
     input_scaled = scaler.transform(input_df)
 
     # 预测概率
-    prob = model.predict_proba(input_scaled)[0, 1]
+    pred_prob = model.predict_proba(input_scaled)[0, 1]
 
     st.subheader("Prediction Results:")
 
-    # 概率显示
+    # Display probability
     st.markdown(
-        f'<h4 style="color:black;">Predicted Risk of Cognitive Aging Acceleration: {prob:.2%}</h4>',
+        f'<h4 style="color:black;">Predicted Risk of Cognitive Aging Acceleration: {pred_prob:.2%}</h2>',
         unsafe_allow_html=True
     )
 
-    # 风险分级
-    if prob < 0.3:
+    # Display risk level
+    if pred_prob < 0.3:
         st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
-    elif 0.3 <= prob <= 0.6:
+    elif 0.3 <= pred_prob <= 0.6:
         st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
     else:
         st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
-    # ==============================
-    # SHAP Interpretation
-    # ==============================
+    # SHAP interpretation
     st.subheader("SHAP Interpretation:")
-    st.write("The figure below shows how each feature contributes to the prediction:")
+    st.write("The figure below shows how each feature pushes the model output:")
 
-    # Explainer
-    explainer = shap.Explainer(model, input_scaled)
-    shap_values = explainer(input_scaled)
+    explainer = shap.LinearExplainer(model, input_scaled)
+    shap_values = explainer.shap_values(input_scaled)
 
-    # ------------------------------
-    # 交互力图（红蓝条）
-    # ------------------------------
-    with st.expander("Show Interactive SHAP Force Plot"):
-        force_plot = shap.plots.force(shap_values[0])
-        st.components.v1.html(
-            f"""
-            <head>{shap.getjs()}</head>
-            <body>{force_plot.html()}</body>
-            """,
-            height=300
-        )
+    # Force plot
+    shap.initjs()
+    st_shap = shap.force_plot(explainer.expected_value, shap_values[0], input_df.iloc[0], matplotlib=True)
+
+    fig = plt.gcf()
+    st.pyplot(fig)
