@@ -1,4 +1,4 @@
-# predictor_xgb_cogage.py
+# predictor_xgb_raw.py
 import streamlit as st
 import pandas as pd
 import joblib
@@ -7,10 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # ==============================
-# 1️⃣ Load model & scaler
+# 1️⃣ Load model (no scaler needed)
 # ==============================
 xgb_model = joblib.load("xgb_simplified_binary_model.pkl")
-scaler = joblib.load("xgb_simplified_scaler.pkl")
 
 # ==============================
 # 2️⃣ Feature definition
@@ -49,14 +48,11 @@ for feature in feature_names:
 # Convert input to DataFrame
 input_df = pd.DataFrame([st.session_state.user_input])
 
-# Standardize input
-input_scaled = scaler.transform(input_df)
-
 # ==============================
 # 4️⃣ Prediction
 # ==============================
 if st.button("Predict"):
-    pred_prob = xgb_model.predict_proba(input_scaled)[0, 1]
+    pred_prob = xgb_model.predict_proba(input_df)[0, 1]
 
     st.subheader("Prediction Result:")
     st.markdown(
@@ -79,7 +75,7 @@ if st.button("Predict"):
     st.write("Red = increases risk, Blue = decreases risk")
 
     explainer = shap.TreeExplainer(xgb_model)
-    shap_values = explainer(input_scaled)
+    shap_values = explainer(input_df)
 
     # Handle expected_value as scalar or array
     ev = explainer.expected_value
