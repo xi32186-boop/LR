@@ -60,17 +60,25 @@ st.write(f"📈 Probability of Cognitive Aging Acceleration: **{prob_accel * 100
 # ==============================
 # 5️⃣ SHAP feature explanation
 # ==============================
-with st.expander("🔍 SHAP Feature Contribution Explanation"):
-    explainer = shap.LinearExplainer(lr_model, input_scaled, feature_perturbation="interventional")
+with st.expander("SHAP Feature Contribution Explanation"):
+
+    explainer = shap.LinearExplainer(lr_model, input_scaled)
     shap_values = explainer.shap_values(input_scaled)
 
-    st.write(
-        "Each feature's contribution to acceleration probability (positive values increase risk, negative values decrease risk)")
+    values = shap_values[0]
+
     shap_df = pd.DataFrame({
         'Feature': list(features_info.keys()),
-        'SHAP value': shap_values[0]
-    }).sort_values(by='SHAP value', key=abs, ascending=False)
+        'SHAP value': values
+    }).sort_values(by='SHAP value', key=abs, ascending=True)
+
     st.dataframe(shap_df)
+
+    fig, ax = plt.subplots()
+    ax.barh(shap_df['Feature'], shap_df['SHAP value'])
+    ax.set_title("SHAP Feature Contribution")
+
+    st.pyplot(fig)
 
     # Bar plot
     plt.figure(figsize=(6, 4))
