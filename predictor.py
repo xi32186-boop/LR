@@ -1,95 +1,116 @@
-# predictor.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
 import shap
 
 # ==============================
-# 1️⃣ Load model
+# Page settings
 # ==============================
-lr_model = joblib.load("lr_simplified_binary_model.pkl")
-scaler = joblib.load("lr_simplified_scaler.pkl")
+st.set_page_config(page_title="Cognitive Aging Risk Prediction", layout="centered")
 
 # ==============================
-# 2️⃣ Feature info
+# Title
 # ==============================
-features_info = {
-    'Age (years)': 'age',
-    'Glucose (mmol/L)': 'glu',
-    'White Blood Cells (10^9/L)': 'wbc',
-    'Hemoglobin (g/L)': 'hb',
-    'Platelets (10^9/L)': 'plt',
-    'ALT (U/L)': 'alt'
+st.title("Cognitive Aging Acceleration Risk Prediction")
+st.write("Please enter the following information, then click 'Predict' to get the risk probability and SHAP interpretation.")
+
+# ==============================
+# Load model
+# ==============================
+@st.cache_resource
+def load_model():
+    model = joblib.load("lr_simplified_binary_model.pkl")
+    scaler = joblib.load("lr_simplified_scaler.pkl")
+    return model, scaler
+
+lr_model, scaler = load_model()
+
+# ==============================
+# Feature info
+# ==============================
+feature_names = ["age", "glu", "wbc", "hb", "plt", "alt"]
+
+feature_labels = {
+    "age": "Age (years)",
+    "glu": "Glucose (mmol/L)",
+    "wbc": "White Blood Cells (10^9/L)",
+    "hb": "Hemoglobin (g/L)",
+    "plt": "Platelets (10^9/L)",
+    "alt": "ALT (U/L)"
 }
 
-features_ordered = list(features_info.values())
+# ==============================
+# Input section（参考你给的格式）
+# ==============================
+st.subheader("Enter Clinical Information:")
+
+# session_state 保持输入
+if "user_input" not in st.session_state:
+    st.session_state.user_input = {f: 0.0 for f in feature_names}
+
+for f in feature_names:
+    st.session_state.user_input[f] = st.number_input(
+        feature_labels[f],
+        value=st.session_state.user_input.get(f, 0.0),
+        key=f
+    )
+
+# DataFrame
+input_df = pd.DataFrame([st.session_state.user_input])
 
 # ==============================
-# 3️⃣ Page UI
-# ==============================
-st.set_page_config(page_title="Cognitive Aging Risk", layout="centered")
-
-st.title("Cognitive Aging Acceleration Risk Prediction")
-
-st.write("Please enter the following information:")
-
-# ==============================
-# 4️⃣ Input (无 +/- 按钮)
-# ==============================
-user_input = {}
-
-cols = st.columns(2)
-
-for i, (label, col) in enumerate(features_info.items()):
-    with cols[i % 2]:
-        user_input[col] = st.text_input(label, value="")
-
-# ==============================
-# 5️⃣ Predict button
+# Prediction
 # ==============================
 if st.button("Predict"):
 
-    try:
-        # 转 float
-        input_values = {k: float(v) for k, v in user_input.items()}
-        input_df = pd.DataFrame([input_values])
+    # 保留1位小数（展示更专业）
+    input_df = input_df.round(1)
 
-        # 保留1位小数
-        input_df = input_df.round(1)
+    # 标准化
+    input_scaled = scaler.transform(input_df)
 
-        # 标准化
-        input_scaled = scaler.transform(input_df[features_ordered])
+    # 预测概率
+    prob = lr_model.predict_proba(input_scaled)[0, 1]
 
-        # ==============================
-        # 6️⃣ Prediction
-        # ==============================
-        prob = lr_model.predict_proba(input_scaled)[0, 1]
+    st.subheader("Prediction Results:")
 
-        st.subheader("Result")
-        st.write(f"Probability of Cognitive Aging Acceleration: **{prob * 100:.1f}%**")
+    # 概率
+    st.markdown(
+        f'<h4>Predicted Risk of Cognitive Aging Acceleration: {prob:.2%}</h4>',
+        unsafe_allow_html=True
+    )
 
-        # ==============================
-        # 7️⃣ SHAP Force Plot
-        # ==============================
-        st.subheader("SHAP Explanation")
+    # ==============================
+    # Risk level
+    # ==============================
+    if prob < 0.3:
+        st.markdown('<h4 style="color:green;">Risk Level: Low Risk</h4>', unsafe_allow_html=True)
+    elif 0.3 <= prob <= 0.6:
+        st.markdown('<h4 style="color:orange;">Risk Level: Moderate Risk</h4>', unsafe_allow_html=True)
+    else:
+        st.markdown('<h4 style="color:red;">Risk Level: High Risk</h4>', unsafe_allow_html=True)
 
-        explainer = shap.LinearExplainer(lr_model, input_scaled)
-        shap_values = explainer.shap_values(input_scaled)
+    # ==============================
+    # SHAP
+    # ==============================
+    st.subheader("SHAP Interpretation:")
+    st.write("The figure below shows how each feature contributes to the prediction:")
 
-        force_plot = shap.force_plot(
-            explainer.expected_value,
-            shap_values[0],
-            input_df.iloc[0],
-            feature_names=list(features_info.keys())
-        )
+    explainer = shap.LinearExplainer(lr_model, input_scaled)
+    shap_values = explainer.shap_values(input_scaled)
 
-        st.components.v1.html(
-            f"""
-            <head>{shap.getjs()}</head>
-            <body>{force_plot.html()}</body>
-            """,
-            height=350
-        )
+    force_plot = shap.force_plot(
+        explainer.expected_value,
+        shap_values[0],
+        input_df.iloc[0],   # ⭐ 用原始值展示
+        feature_names=[feature_labels[f] for f in feature_names]
+    )
 
-    except:
-        st.error("Please enter valid numeric values.")
+    st.components.v1.html(
+        f"""
+        <head>{shap.getjs()}</head>
+        <body>{force_plot.html()}</body>
+        """,
+        height=350
+    )
