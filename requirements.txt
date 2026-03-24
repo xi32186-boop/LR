@@ -6,3 +6,5 @@ joblib
 matplotlib
 shap
 ipython
+xgboost
+
